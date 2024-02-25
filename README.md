@@ -44,4 +44,122 @@ Crossplane is an open-source Kubernetes add-on that extends Kubernetes to enable
    Create an IAM identity mapping for cluster access.
    ```bash
    eksctl create iamidentitymapping --cluster test-eks-cluster --arn <iam-user-arn> --username <username> --group system:masters
-   ``````
+   ```
+
+3. **Update the kubeconfig**
+  
+   Update the kubeconfig.
+   ```bash
+   aws eks update-kubeconfig --region <region> --name <cluster-name>
+   ```
+
+4. **Verify Cluster Access**
+
+   Verify access to the Kubernetes cluster.
+   ```bash
+   kubectl get svc
+   ```
+
+5. **Install Crossplane Using Helm**
+
+   Add the Crossplane Helm repository and install Crossplane.
+   ```bash
+   helm repo add crossplane-stable https://charts.crossplane.io/stable
+   helm repo update
+   helm install crossplane crossplane-stable/crossplane --namespace crossplane-system --create-namespace
+   ```
+
+6. **Verify Crossplane Installation**
+
+   Check the Crossplane pods and API resources..
+   ```bash
+   kubectl get pods -n crossplane-system
+   kubectl api-resources | grep crossplane
+   ```
+
+7. **Install AWS Provider for Crossplane**
+
+   Apply the AWS provider configuration.
+
+   ```bash
+   cat <<EOF | kubectl apply -f -
+   apiVersion: pkg.crossplane.io/v1
+   kind: Provider
+   metadata:
+     name: provider-aws-s3
+   spec:
+     package: xpkg.upbound.io/upbound/provider-aws-s3:v1.1.0
+   EOF
+   ```
+
+8. **Verify Provider Installation**
+
+   List the installed providers..
+   ```bash
+   kubectl get providers
+   ```   
+
+9. **Create a Kubernetes secret for AWS**
+
+   Note: The provider requires credentials to create and manage AWS resources.
+
+   Create a text file containing the AWS account aws_access_key_id and aws_secret_access_key. Save this text file as aws-credentials.txt.
+   ```ini
+   [default]
+   aws_access_key_id = YOUR_ACCESS_KEY_ID
+   aws_secret_access_key = YOUR_SECRET_ACCESS_KEY
+   ```
+   Create the secret in the crossplane-system namespace.
+   ```bash
+   kubectl create secret generic aws-secret -n crossplane-system --from-file=creds=./aws-credentials.txt
+   ```   
+
+10. **Create a ProviderConfig**
+
+   Apply the ProviderConfig to use the secret for AWS operations.
+   ```bash
+   cat <<EOF | kubectl apply -f -
+   apiVersion: aws.upbound.io/v1beta1
+   kind: ProviderConfig
+   metadata:
+     name: default
+   spec:
+     credentials:
+       source: Secret
+       secretRef:
+         namespace: crossplane-system
+         name: aws-secret
+         key: creds
+   EOF
+   ``` 
+
+11. **Create a managed resource in AWS**
+
+   Example: Create an S3 bucket.
+   ```bash
+   cat <<EOF | kubectl create -f -
+   apiVersion: s3.aws.upbound.io/v1beta1
+   kind: Bucket
+   metadata:
+     generateName: crossplane-bucket-
+   spec:
+     forProvider:
+       region: ap-south-1
+     providerConfigRef:
+       name: default
+   EOF
+   ```     
+
+12. **Get buckets created using Crossplane**
+
+   List the buckets managed by Crossplane.
+   ```bash
+   kubectl get buckets
+   ```        
+
+13. **Delete managed resource from AWS**
+
+   Delete an S3 bucket managed by Crossplane.
+   ```bash
+   kubectl delete bucket <bucket-name>
+   ```         

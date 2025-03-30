@@ -33,7 +33,7 @@ Crossplane is an open-source Kubernetes add-on that extends Kubernetes to enable
 
    Clone the repository and apply the Terraform configuration to provision the EKS cluster.
    ```bash
-   git clone https://github.com/rajendra-jagtap/aws-eks-crossplane.git
+   git clone https://github.com/vkhadela1985/aws-eks-crossplane.git
    cd aws-eks-crossplane
    terraform init
    terraform plan
